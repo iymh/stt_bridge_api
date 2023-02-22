@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+
+  <link href="https://fonts.googleapis.com/css?family=Roboto:100,300,400,500,700,900" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/@mdi/font@6.x/css/materialdesignicons.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/vuetify@2.x/dist/vuetify.min.css" rel="stylesheet">
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GPT3 TEST</title>
+  <style>
+    .wdt_12rem {
+      width: 12rem;
+    }
+  </style>
+
+</head>
+
+<body>
+  <div id="app">
+    <v-app>
+      <v-app-bar app>
+        <v-app-bar-title>GPT3</v-app-bar-title>
+      </v-app-bar>
+
+      <v-main>
+        <v-container>
+          <v-divider></v-divider>
+          <div class="text-h5 primary--text">Send Text:</div>
+          <div class="ma-2">
+            <v-row class="justify-center align-center ma-3">
+              <v-combobox
+                class="flex-grow-1 ma_lr_1rem ma_tp_05rem"
+                v-model="send_text"
+                :items="send_text_samples"
+                label="質問文"
+                outlined
+                clearable
+                counter
+                dense
+                rows="1"
+              ></v-combobox>
+              
+              <v-btn 
+                color="primary"
+                fab
+                @click="onSendBtn()">
+                <v-icon>mdi-send</v-icon>
+              </v-btn>
+            </v-row>
+          </div>
+
+          <v-divider></v-divider>
+          <div class="text-h5 primary--text">Result:</div>
+            <v-row class="justify-center" v-if="isLoading">
+              <v-progress-circular
+                v-show="isLoading"
+                :size="50"
+                color="primary"
+                indeterminate
+              ></v-progress-circular>
+            </v-row>
+           <div class="ma-2">
+            <v-row class="justify-center">
+              <div class="flex-grow-1">
+                <div class="ma-5">
+                  <div class="accent text-h5">text</div>
+                  <div>{{ ret_text }}</div>
+                </div>
+              </div>
+            </v-row>
+          </div>
+
+        </v-container>
+      </v-main>
+    </v-app>
+  </div>
+
+
+  <script src="https://cdn.jsdelivr.net/npm/vue@2.x/dist/vue.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/vuetify@2.x/dist/vuetify.js"></script>
+  <script src="./sse.js"></script>
+  <script>
+    const LOCAL_URL = "https://api.openai.com/v1/completions";
+    const OPENAI_KEY = "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";
+
+    new Vue({
+      el: '#app',
+      vuetify: new Vuetify(),
+
+      data:() => ({
+        server_url: LOCAL_URL,
+        isLoading: false,
+        send_text: "",
+        send_text_samples: ["Watsonとは？", "Watsonライブラリとは？"],
+        ret_text: "result text.",
+      }),
+      methods: {
+
+        sendRequest(){
+          let self = this;
+
+          // set request
+          let evtSource = new SSE(
+              `${this.server_url}`,
+              {
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: "Bearer " + OPENAI_KEY,
+                },
+                method: "POST",
+                payload: JSON.stringify({
+                  model: "text-davinci-003",
+                  prompt: this.send_text,
+                  temperature: 0,
+                  // top_p: 0,
+                  max_tokens: 1000,
+                  stream: true,
+                  // stop: ["\n\n"],
+                }),
+              }
+            );
+          evtSource.addEventListener("message", function (e) {
+            // Assuming we receive JSON-encoded data payloads:
+            console.log(e);
+            if (e.data === "[DONE]") {
+              console.log("Response DONE!");
+              self.isLoading = false;
+              return;
+            }
+            var dt = JSON.parse(e.data);
+            if (dt.choices) {
+              self.ret_text += dt.choices[0].text;
+            }
+          });
+          evtSource.stream();
+        },
+
+        onSendBtn(){
+          this.ret_text = "";
+          this.isLoading = true;
+          this.sendRequest();
+        },
+      },
+      mounted() {
+        console.log("vue mounted.");
+      }
+    })
+
+  </script>
+</body>
+
+</html>
