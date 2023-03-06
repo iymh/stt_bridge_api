@@ -28,12 +28,12 @@
 
         <v-app-bar-title>Speech to Text</v-app-bar-title>
         <v-spacer></v-spacer>
-        <v-switch
+        <!-- <v-switch
           v-model="local_mode"
           :label="`LocalMode`"
           hide-details
           class="ma-2"
-        ></v-switch>
+        ></v-switch> -->
 
       </v-app-bar>
 
@@ -291,7 +291,7 @@
   <script>
     const LOCAL_URL = "http://localhost:1090/speech-to-text/api/v1/";
     // const BRIDGE_URL = "http://localhost:3000/";
-    const BRIDGE_URL = "../";
+    const BRIDGE_URL = "./";
 
     new Vue({
       el: '#app',
