@@ -3,6 +3,7 @@ FROM node:16 AS build-env
 ADD package.json /app/
 ADD package-lock.json /app/
 ADD server.js /app/
+ADD public/ /app/public/
 
 RUN cd /app; npm ci --only=production
 
