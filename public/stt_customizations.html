@@ -1,0 +1,1272 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+
+  <link href="https://fonts.googleapis.com/css?family=Roboto:100,300,400,500,700,900" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/@mdi/font@6.x/css/materialdesignicons.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/vuetify@2.x/dist/vuetify.min.css" rel="stylesheet">
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>STT customizations</title>
+  <style>
+    [v-cloak] {
+      display: none;
+    }
+    .wdt_10rem {
+      width: 10rem;
+    }
+    .wdt_12rem {
+      width: 12rem;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="app" v-cloak>
+    <v-app>
+      <v-app-bar app>
+        <v-app-bar-title>Speech to Text custom model</v-app-bar-title>
+        <v-spacer></v-spacer>
+        <!-- <v-switch
+          v-model="local_mode"
+          :label="`LocalMode`"
+          hide-details
+          class="ma-2"
+        ></v-switch> -->
+      </v-app-bar>
+
+      <!-- Dialog Component -->
+      <v-dialog v-model="cfmDialog.show" width="40%" persistent>
+        <v-card>
+          <v-card-title>
+            <span class="headline">{{ cfmDialog.title }}</span>
+          </v-card-title>
+
+          <v-card-text>
+            <v-container>
+              {{ cfmDialog.text }}
+            </v-container>
+          </v-card-text>
+
+          <v-card-actions>
+            <v-spacer></v-spacer>
+            <v-btn @click="cfmDialog.show=false">キャンセル</v-btn>
+            <v-btn color="primary" @click="cfmDialog.CB(); cfmDialog.show=false;">OK</v-btn>
+          </v-card-actions>
+        </v-card>
+      </v-dialog>
+
+      <v-dialog v-model="addCModelDialog.show" width="80%" persistent>
+        <v-card>
+          <v-card-title>
+            <span class="headline">Create Custom Language Model</span>
+          </v-card-title>
+
+          <v-card-text>
+            <v-container>
+              <div class="text-h5 primary--text">Base Language Model:</div>
+              <div class="ma-2">
+                <v-row class="">
+                  <v-col class="col-8">
+                    <v-select
+                      label="Model"
+                      outlined
+                      dense
+                      :items="model_items"
+                      item-text="name"
+                      item-value="name"
+                      v-model="create_model_info.base_model"
+                      return-object
+                      hide-details
+                      @input="onModelSelectChange()"
+                    ></v-select>
+                  </v-col>
+                  <v-col class="col-4">
+                    <v-btn 
+                      tile color="primary"
+                      elevation="1"
+                      rounded
+                      :loading="model_loading"
+                      @click="onModelList()">
+                      <v-icon left>mdi-web</v-icon>
+                      <span>Model List</span>
+                    </v-btn>
+                  </v-col>
+                </v-row>
+                <div class="">
+                  <div class="ma-0 row">
+                    <div class="ma-1 accent--text wdt_12rem">description:</div>
+                    <div class="ma-1">{{ model_selected_info.description }}</div>
+                  </div>
+                  <div class="ma-0 row">
+                    <div class="ma-1 accent--text wdt_12rem">url:</div>
+                    <div class="ma-1">{{ model_selected_info.url }}</div>
+                  </div>
+                  <div class="ma-0 row" v-if="model_selected_info.supported_features">
+                    <div class="ma-1 accent--text wdt_12rem">custom_language_model:</div>
+                    <div class="ma-1">{{ model_selected_info.supported_features.custom_language_model }}</div>
+                  </div>
+                </div>
+              </div>
+
+              <v-divider></v-divider>
+              <div class="text-h5 primary--text">Create Parameters:</div>
+              <div class="ma-2">
+                <v-form>
+                  <v-text-field
+                    class="flex-grow-1 ma_lr_1rem ma_tp_05rem"
+                    v-model="create_model_info.name"
+                    label="name"
+                    :rules="[create_model_rules.required]"
+                    outlined
+                    clearable
+                    counter
+                    dense
+                    rows="1"
+                  ></v-text-field>
+                  <v-text-field
+                    class="flex-grow-1 ma_lr_1rem ma_tp_05rem"
+                    v-model="create_model_info.description"
+                    label="description"
+                    outlined
+                    clearable
+                    counter
+                    dense
+                    rows="1"
+                  ></v-text-field>
+                </v-form>
+
+                <v-btn 
+                  tile color="primary"
+                  elevation="1"
+                  rounded
+                  :loading="cstm_model_creating"
+                  @click="onModelCreate()">
+                  <v-icon left>mdi-send</v-icon>
+                  <span>Create Model</span>
+                </v-btn>
+                </div>
+            </v-container>
+          </v-card-text>
+
+          <v-card-actions>
+            <v-spacer></v-spacer>
+            <v-btn @click="addCModelDialog.show=false">Close</v-btn>
+          </v-card-actions>
+        </v-card>
+      </v-dialog>
+
+      <v-dialog v-model="addCorporaDialog.show" width="80%" persistent>
+        <v-card>
+          <v-card-title>
+            <span class="headline">Create Corpora</span>
+          </v-card-title>
+
+          <v-card-text>
+            <v-container>
+              <div class="text-h5 primary--text">Send Text File:</div>
+              <div class="ma-2">
+                <v-text-field
+                  class="flex-grow-1 ma_lr_1rem ma_tp_05rem"
+                  v-model="send_corpora.name"
+                  label="Corpora Name"
+                  :rules="[create_model_rules.required]"
+                  outlined
+                  clearable
+                  counter
+                  dense
+                  rows="1"
+                ></v-text-field>
+
+                <v-file-input 
+                  show-size
+                  label="Text File"
+                  accept="text/*"
+                  hide-details
+                  v-model="send_corpora.file"
+                ></v-file-input>
+
+                <v-row class="justify-center align-center ma-3">
+                  <v-btn 
+                    tile color="primary"
+                    elevation="1"
+                    rounded
+                    :loading="isCoporaTextUploading"
+                    @click="onCorporaSendFile()">
+                    <v-icon left>mdi-send</v-icon>
+                    <span>Send File</span>
+                  </v-btn>
+                </v-row>
+              </div>
+
+            </v-container>
+          </v-card-text>
+
+          <v-card-actions>
+            <v-spacer></v-spacer>
+            <v-btn @click="addCorporaDialog.show=false">Close</v-btn>
+          </v-card-actions>
+        </v-card>
+      </v-dialog>
+
+      <v-dialog v-model="addWordsDialog.show" width="80%" persistent>
+        <v-card>
+          <v-card-title>
+            <span class="headline">Create Words</span>
+          </v-card-title>
+
+          <v-card-text>
+            <v-container>
+              <div class="text-h5 primary--text">Send Json Data:</div>
+              <div class="ma-2">
+
+                <v-file-input 
+                  show-size
+                  class="ma-2"
+                  label="Json File"
+                  accept="application/json"
+                  hide-details
+                  @change="onWordsFileChange"
+                ></v-file-input>
+
+                <v-simple-table dense>
+                  <template v-slot:default>
+                    <thead>
+                      <tr>
+                        <th class="text-left">word</th>
+                        <th class="text-left">sounds_like</th>
+                        <th class="text-left">display_as</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="item in send_words.json">
+                        <td>{{ item.word }}</td>
+                        <td>
+                          <div v-for="sl in item.sounds_like">
+                            <div>{{ sl }}</div>
+                          </div>
+                        </td>
+                        <td>{{ item.display_as }}</td>
+                      </tr>
+                    </tbody>
+                  </template>
+                </v-simple-table>
+
+                <v-row class="justify-center align-center ma-3">
+                  <v-btn 
+                    tile color="primary"
+                    elevation="1"
+                    rounded
+                    :loading="isWordsJsonUploading"
+                    @click="onWordsSendJson()">
+                    <v-icon left>mdi-send</v-icon>
+                    <span>Send Json</span>
+                  </v-btn>
+                </v-row>
+
+                <div class="info--text">{{ send_words.result.status }}</div>
+                <div class="error--text">{{ send_words.result.message }}</div>
+              </div>
+
+            </v-container>
+          </v-card-text>
+
+          <v-card-actions>
+            <v-spacer></v-spacer>
+            <v-btn @click="addWordsDialog.show=false">Close</v-btn>
+          </v-card-actions>
+        </v-card>
+      </v-dialog>
+
+      <!-- Toast Component -->
+      <v-snackbar
+        v-model="toast.show"
+        bottom
+        multi-line
+        :timeout="toast.timeout"
+        :color="toast.type"
+        @click="toast.show = false">
+        <div class="rw">{{ toast.text }}</div>
+      </v-snackbar>
+
+      <v-main>
+        <v-container>
+          <div class="text-h5 primary--text">Custom Language Model</div>
+          <div class="ma-2">
+            <v-row class="align-center">
+              <v-col class="col">
+                <v-select
+                  label="Custom Model"
+                  outlined
+                  dense
+                  :items="cstm_model_items"
+                  item-text="name"
+                  item-value="customization_id"
+                  v-model="cstm_model_selected"
+                  return-object
+                  hide-details
+                  @input="onCustomModelSelectChange()"
+                ></v-select>
+              </v-col>
+              <v-col class="col-3">
+                <v-btn
+                  class="wdt_12rem"
+                  tile color="primary"
+                  elevation="1"
+                  rounded
+                  :loading="cstm_model_loading"
+                  @click="onCustomModelList()">
+                  <v-icon left>mdi-view-list</v-icon>
+                  <span>Model List</span>
+                </v-btn>
+              </v-col>
+            </v-row>
+
+            <v-row class="ma-3">
+              <v-col class="col">
+                <div class="ma-0 row">
+                  <div class="ma-1 accent--text wdt_12rem">description:</div>
+                  <div class="ma-1">{{ cstm_model_selected.description }}</div>
+                </div>
+                <div class="ma-0 row">
+                  <div class="ma-1 accent--text wdt_12rem">customization_id:</div>
+                  <div class="ma-1">{{ cstm_model_selected.customization_id }}</div>
+                </div>
+                <div class="ma-0 row">
+                  <div class="ma-1 accent--text wdt_12rem">base_model_name:</div>
+                  <div class="ma-1">{{ cstm_model_selected.base_model_name }}</div>
+                </div>
+                <div class="ma-0 row">
+                  <div class="ma-1 accent--text wdt_12rem">created:</div>
+                  <div class="ma-1">{{ cstm_model_selected.created }}</div>
+                </div>
+                <div class="ma-0 row">
+                  <div class="ma-1 accent--text wdt_12rem">updated:</div>
+                  <div class="ma-1">{{ cstm_model_selected.updated }}</div>
+                </div>
+                <div class="ma-0 row">
+                  <div class="ma-1 accent--text wdt_12rem">status:</div>
+                  <div class="ma-1">{{ cstm_model_selected.status }}</div>
+                </div>
+                <div class="ma-0 row">
+                  <div class="ma-1 accent--text wdt_12rem">progress:</div>
+                  <div class="ma-1">{{ cstm_model_selected.progress }}</div>
+                </div>
+                <div class="ma-0 row">
+                  <div class="ma-1 accent--text wdt_12rem">error:</div>
+                  <div class="ma-1">{{ cstm_model_selected.error }}</div>
+                </div>
+              </v-col>
+
+              <v-col class="col-3">
+                <v-btn
+                  class="ma-2 wdt_12rem"
+                  tile color="success"
+                  elevation="1"
+                  rounded
+                  @click="addCModelDialog.show=true">
+                  <v-icon left>mdi-plus</v-icon>
+                  <span>Add Model</span>
+                </v-btn>
+
+                <v-btn
+                  v-if="cstm_model_selected.customization_id"
+                  class="ma-2 wdt_12rem"
+                  tile color="primary"
+                  elevation="1"
+                  rounded
+                  @click="onCustomModelSelectChange()">
+                  <v-icon left>mdi-reload</v-icon>
+                  <span>Reload Info</span>
+                </v-btn>
+
+                <v-btn
+                  v-if="cstm_model_selected.customization_id"
+                  class="ma-2 wdt_12rem"
+                  tile color="primary"
+                  elevation="1"
+                  rounded
+                  @click="onCustomModelTrain()">
+                  <v-icon left>mdi-head-sync-outline</v-icon>
+                  <span>Train Model</span>
+                </v-btn>
+
+                <v-btn
+                  v-if="cstm_model_selected.customization_id"
+                  class="ma-2 wdt_12rem"
+                  tile color="warning"
+                  elevation="1"
+                  rounded
+                  @click="onCustomModelReset()">
+                  <v-icon left>mdi-cog-refresh</v-icon>
+                  <span>Reset Model</span>
+                </v-btn>
+
+                <v-btn
+                  v-if="cstm_model_selected.customization_id"
+                  class="ma-2 wdt_12rem"
+                  tile color="error"
+                  elevation="1"
+                  rounded
+                  :loading="isModelDeleting"
+                  @click="onCustomModelDelete()">
+                  <v-icon left>mdi-delete</v-icon>
+                  <span>Delete Model</span>
+                </v-btn>
+
+              </v-col>
+            </v-row>
+
+          </div>
+
+          <v-divider></v-divider>
+
+          <div class="text-h5 primary--text">Corpora</div>
+          <div class="ma-2">
+            <v-row class="align-center">
+              <v-col class="col">
+                <v-select
+                  label="Corpora"
+                  outlined
+                  dense
+                  :items="corpora_items"
+                  item-text="name"
+                  item-value="name"
+                  v-model="corpora_selected"
+                  return-object
+                  hide-details
+                  @input="onCorporaSelectChange()"
+                ></v-select>
+              </v-col>
+              <v-col class="col-3">
+                <v-btn
+                  class="wdt_12rem"
+                  tile color="primary"
+                  elevation="1"
+                  rounded
+                  :loading="corpora_loading"
+                  @click="onCorporaList()">
+                  <v-icon left>mdi-view-list</v-icon>
+                  <span>Corpora List</span>
+                </v-btn>
+              </v-col>
+            </v-row>
+
+            <v-row class="ma-3">
+              <v-col class="col">
+                <div class="">
+                  <div class="ma-0 row">
+                    <div class="ma-1 accent--text wdt_12rem">out_of_vocabulary_words:</div>
+                    <div class="ma-1">{{ corpora_selected.out_of_vocabulary_words }}</div>
+                  </div>
+                  <div class="ma-0 row">
+                    <div class="ma-1 accent--text wdt_12rem">total_words:</div>
+                    <div class="ma-1">{{ corpora_selected.total_words }}</div>
+                  </div>
+                  <div class="ma-0 row">
+                    <div class="ma-1 accent--text wdt_12rem">status:</div>
+                    <div class="ma-1">{{ corpora_selected.status }}</div>
+                  </div>
+                </div>
+              </v-col>
+
+              <v-col class="col-3">
+                <v-btn
+                  class="ma-2 wdt_12rem"
+                  tile color="success"
+                  elevation="1"
+                  rounded
+                  @click="addCorporaDialog.show=true">
+                  <v-icon left>mdi-plus</v-icon>
+                  <span>Add Corpora</span>
+                </v-btn>
+
+                <v-btn
+                  v-if="corpora_selected.name"
+                  class="ma-2 wdt_12rem"
+                  tile color="primary"
+                  elevation="1"
+                  rounded
+                  @click="onCorporaSelectChange()">
+                  <v-icon left>mdi-reload</v-icon>
+                  <span>Reload Info</span>
+                </v-btn>
+
+                <v-btn
+                  v-if="corpora_selected.name"
+                  class="ma-2 wdt_12rem"
+                  tile color="error"
+                  elevation="1"
+                  rounded
+                  :loading="isCorporaDeleting"
+                  @click="onCorporaDelete()">
+                  <v-icon left>mdi-delete</v-icon>
+                  <span>Delete Corpora</span>
+                </v-btn>
+              </v-col>
+            </v-row>
+          </div>
+
+          <div class="text-h5 primary--text">Words</div>
+          <div class="ma-2">
+            <v-row class="align-center">
+              <v-col class="col">
+                <v-select
+                  label="Words"
+                  outlined
+                  dense
+                  :items="words_items"
+                  item-text="word"
+                  item-value="word"
+                  v-model="words_selected"
+                  return-object
+                  hide-details
+                  @input="onWordsSelectChange()"
+                ></v-select>
+              </v-col>
+              <v-col class="col-3">
+                <v-btn
+                  class="wdt_12rem"
+                  tile color="primary"
+                  elevation="1"
+                  rounded
+                  :loading="words_loading"
+                  @click="onWordsList()">
+                  <v-icon left>mdi-view-list</v-icon>
+                  <span>Words List</span>
+                </v-btn>
+              </v-col>
+            </v-row>
+
+            <v-row class="ma-3">
+              <v-col class="col">
+                <div class="">
+                  <div class="ma-0 row">
+                    <div class="ma-1 accent--text wdt_12rem">sounds_like:</div>
+                    <div class="ma-1">{{ words_selected.sounds_like }}</div>
+                  </div>
+                  <div class="ma-0 row">
+                    <div class="ma-1 accent--text wdt_12rem">display_as:</div>
+                    <div class="ma-1">{{ words_selected.display_as }}</div>
+                  </div>
+                  <div class="ma-0 row">
+                    <div class="ma-1 accent--text wdt_12rem">error:</div>
+                    <div class="ma-1">{{ words_selected.error }}</div>
+                  </div>
+                </div>
+              </v-col>
+
+              <v-col class="col-3">
+                <v-btn
+                  class="ma-2 wdt_12rem"
+                  tile color="success"
+                  elevation="1"
+                  rounded
+                  @click="addWordsDialog.show=true">
+                  <v-icon left>mdi-playlist-plus</v-icon>
+                  <span>Add Words</span>
+                </v-btn>
+
+                <v-btn
+                  class="ma-2 wdt_12rem"
+                  tile color="success"
+                  elevation="1"
+                  rounded
+                  @click="addWordDialog.show=true">
+                  <v-icon left>mdi-plus</v-icon>
+                  <span>Add Word</span>
+                </v-btn>
+
+                <v-btn
+                  v-if="words_selected.word"
+                  class="ma-2 wdt_12rem"
+                  tile color="primary"
+                  elevation="1"
+                  rounded
+                  @click="onWordsSelectChange()">
+                  <v-icon left>mdi-reload</v-icon>
+                  <span>Reload Info</span>
+                </v-btn>
+
+                <v-btn
+                  v-if="words_selected.word"
+                  class="ma-2 wdt_12rem"
+                  tile color="error"
+                  elevation="1"
+                  rounded
+                  :loading="isWordDeleting"
+                  @click="onWordDelete()">
+                  <v-icon left>mdi-delete</v-icon>
+                  <span>Delete Word</span>
+                </v-btn>
+
+              </v-col>
+            </v-row>
+          </div>
+        </v-container>
+      </v-main>
+    </v-app>
+  </div>
+
+
+  <script src="https://cdn.jsdelivr.net/npm/vue@2.x/dist/vue.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/vuetify@2.x/dist/vuetify.js"></script>
+  <script>
+    const LOCAL_URL = "http://localhost:1090/speech-to-text/api/v1/";
+    const BRIDGE_URL = "http://localhost:3000/";
+
+    new Vue({
+      el: '#app',
+      vuetify: new Vuetify(),
+
+      data:() => ({
+        local_mode: false,
+        // components
+        toast:{
+          show: false,
+          timeout: 5000,
+          type: "primary",
+          text:""
+        },
+
+        cfmDialog: {
+          show : false,
+          title : "",
+          text : "",
+          CB : null
+        },
+
+        addCModelDialog: {
+          show : false,
+        },
+        addCorporaDialog: {
+          show : false,
+        },
+        addWordsDialog: {
+          show : false,
+        },
+        addWordDialog: {
+          show : false,
+        },
+
+        // Create Dialog
+        model_loading: false,
+        model_items:[],
+        model_selected: "",
+        model_selected_info: "",
+
+        create_model_rules: {
+          required: value => !!value || 'Required.',
+        },
+        create_model_info:{
+          "name":"",
+          "base_model":"",
+          "description":""
+        },
+        create_model_result: "",
+        cstm_model_creating: false,
+
+        // Custom Model
+        cstm_model_loading: false,
+        cstm_model_items:[],
+        cstm_model_selected: "",
+        isModelDeleting: false,
+
+        // Copora
+        corpora_loading: false,
+        corpora_items:[],
+        corpora_selected: "",
+        isCorporaDeleting: false,
+
+        send_corpora:{
+          name:"",
+          file:null
+        },
+        isCoporaTextUploading: false,
+
+        // Words
+        words_loading: false,
+        words_items:[],
+        words_selected: "",
+        isWordDeleting: false,
+
+        send_words:{
+          json:[],
+          result:{
+            status:"",
+            message:""
+          }
+        },
+        isWordsJsonUploading: false,
+
+      }),
+      methods: {
+        // components
+        showToast(msg) {
+          this.toast.text = msg;
+          this.toast.show = true;
+        },
+
+        // on Create Dialog
+        onModelList(){
+          this.model_loading = true;
+          let baseurl = (this.local_mode) ? LOCAL_URL : BRIDGE_URL;
+          fetch(
+              `${baseurl}models`, {
+                method: "GET",
+                headers: {
+                  "Content-Type": "application/json"
+                }
+              }
+            )
+            .then(res => res.json())
+            .then(json => {
+              console.log(json);
+              this.model_loading = false;
+
+              let modellist = json.models;
+              // sort by name
+              modellist = modellist.sort((a, b) => {
+                return a.name < b.name ? -1 : 1;
+              });
+              
+              // filter by only ja-JP
+              modellist = modellist.filter(item => item.language === 'ja-JP')
+              // console.log(modellist);
+
+              this.model_items = modellist;
+
+              this.create_model_info.base_model = this.model_items[0];
+              this.onModelSelectChange();
+            })
+        },
+        onModelSelectChange(){
+          let model = this.create_model_info.base_model.name;
+          if (!model) {
+            console.error("selected model is nothing.");
+            return;
+          }
+
+          let baseurl = (this.local_mode) ? LOCAL_URL : BRIDGE_URL;
+          fetch(
+            `${baseurl}models/${model}`, {
+              method: "GET",
+              headers: {
+                "Content-Type": "application/json"
+              }
+            }
+          )
+            .then(res => res.json())
+            .then(json => {
+              console.log(json);
+              this.model_selected_info = json;
+            })
+        },
+
+        onModelCreate(){
+          let sendurl = `${(this.local_mode) ? LOCAL_URL : BRIDGE_URL}customizations`;
+
+          this.cstm_model_creating = true;
+
+          let options = {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              "name": this.create_model_info.name,
+              "base_model_name": this.create_model_info.base_model.name,
+              "description": this.create_model_info.description
+            })
+          };
+
+          fetch(
+              `${sendurl}`,
+              options
+            )
+            .then(res => res.json())
+            .then(json => {
+              console.log(json);
+              this.cstm_model_creating = false;
+              this.create_model_result = json;
+
+              this.showToast(`${this.create_model_info.name} を作成しました`);
+            })
+            .catch(err => {
+              console.log('error:', err);
+              this.cstm_model_creating = false;
+            });
+        },
+
+        // Custom Model
+        onCustomModelList(){
+          this.cstm_model_items = [];
+          this.cstm_model_selected = "";
+
+          let baseurl = (this.local_mode) ? LOCAL_URL : BRIDGE_URL;
+          fetch(
+              `${baseurl}customizations`, {
+                method: "GET",
+                headers: {
+                  "Content-Type": "application/json"
+                }
+              }
+            )
+            .then(res => res.json())
+            .then(json => {
+              console.log(json);
+
+              let cmodellist = json.customizations;
+              if (cmodellist.length <=0) {
+                this.showToast(`カスタムモデルはありません`);
+                return;
+              }
+
+              // sort by name
+              cmodellist = cmodellist.sort((a, b) => {
+                return a.name < b.name ? -1 : 1;
+              });
+              this.cstm_model_items = cmodellist;
+
+              // first select.
+              this.cstm_model_selected = this.cstm_model_items[0];
+
+              this.onCustomModelSelectChange();
+            })
+        },
+        onCustomModelSelectChange(evt){
+          console.log(evt);
+
+          let model = this.cstm_model_selected.customization_id;
+          if (!model) {
+            console.error("selected model is nothing.");
+            return;
+          }
+
+          let baseurl = (this.local_mode) ? LOCAL_URL : BRIDGE_URL;
+          fetch(
+            `${baseurl}customizations/${model}`, {
+              method: "GET",
+              headers: {
+                "Content-Type": "application/json"
+              }
+            }
+          )
+            .then(res => res.json())
+            .then(json => {
+              console.log(json);
+              this.cstm_model_selected = json;
+
+              // this.onCorporaList();
+            })
+        },
+
+        onCustomModelDelete(){
+          this.cfmDialog.title = "カスタムモデル 削除確認";
+          this.cfmDialog.text = `${this.cstm_model_selected.name} 削除しますか？`;
+          this.cfmDialog.CB = ()=>{
+            this.isModelDeleting = true;
+            let baseurl = (this.local_mode) ? LOCAL_URL : BRIDGE_URL;
+            fetch(
+                `${baseurl}customizations/${this.cstm_model_selected.customization_id}`, {
+                  method: "DELETE",
+                }
+              )
+              .then(res => {
+                console.log(res);
+                this.isModelDeleting = false;
+
+                this.showToast(`${this.cstm_model_selected.name} を削除しました`);
+                this.onCustomModelList();
+              })
+              .catch(err =>{
+                console.error(err);
+                this.isModelDeleting = false;
+              })
+          };
+          this.cfmDialog.show = true;
+        },
+
+        onCustomModelTrain(){
+          this.cfmDialog.title = "カスタムモデル 学習確認";
+          this.cfmDialog.text = `${this.cstm_model_selected.name} 学習しますか？`;
+          this.cfmDialog.CB = ()=>{
+            let model = this.cstm_model_selected.customization_id;
+            if (!model) {
+              console.error("selected model is nothing.");
+              return;
+            }
+
+            let baseurl = (this.local_mode) ? LOCAL_URL : BRIDGE_URL;
+            fetch(
+              `${baseurl}customizations/${model}/train`, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json"
+                }
+              }
+            )
+              .then(res => res.json())
+              .then(json => {
+                console.log(json);
+                this.showToast(`${this.cstm_model_selected.name} を学習を開始しました`);
+                let time = 0;
+                let timer = setInterval(() => {
+                  if ((this.cstm_model_selected.status === "available")||(this.cstm_model_selected.status === "failed")) {
+                    clearInterval(timer);
+                    timer = null;
+                  }else{
+                    time += 5;
+                    this.cstm_model_selected.progress = `training: ${time}sec`;
+                    this.onCustomModelSelectChange();
+                  }
+                }, 5000);
+              })
+          };
+          this.cfmDialog.show = true;
+        },
+
+        onCustomModelReset(){
+          this.cfmDialog.title = "カスタムモデル 初期化確認";
+          this.cfmDialog.text = `${this.cstm_model_selected.name} 初期化しますか？`;
+          this.cfmDialog.CB = ()=>{
+            let model = this.cstm_model_selected.customization_id;
+            if (!model) {
+              console.error("selected model is nothing.");
+              return;
+            }
+
+            let baseurl = (this.local_mode) ? LOCAL_URL : BRIDGE_URL;
+            fetch(
+              `${baseurl}customizations/${model}/reset`, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json"
+                }
+              }
+            )
+              .then(res => res.json())
+              .then(json => {
+                console.log(json);
+                this.showToast(`${this.cstm_model_selected.name} を初期化しました`);
+                setTimeout(() => {
+                  this.onCustomModelSelectChange();
+                }, 3000);
+              })
+          };
+          this.cfmDialog.show = true;
+        },
+
+        // Corpora
+        onCorporaList(){
+          let model = this.cstm_model_selected.customization_id;
+          if (!model) {
+            console.error("selected model is nothing.");
+            return;
+          }
+
+          this.corpora_items = [];
+          this.corpora_selected = "";
+
+          let baseurl = (this.local_mode) ? LOCAL_URL : BRIDGE_URL;
+          fetch(
+              `${baseurl}customizations/${model}/corpora`, {
+                method: "GET",
+                headers: {
+                  "Content-Type": "application/json"
+                }
+              }
+            )
+            .then(res => res.json())
+            .then(json => {
+              console.log(json);
+
+
+              let coporalist = json.corpora;
+              if (coporalist.length <=0) {
+                this.showToast(`コーパスはありません`);
+                return;
+              }
+
+              // sort by name
+              coporalist = coporalist.sort((a, b) => {
+                return a.name < b.name ? -1 : 1;
+              });
+              this.corpora_items = coporalist;
+
+              // first select.
+              this.corpora_selected = this.corpora_items[0];
+              this.onCorporaSelectChange();
+            })
+        },
+        onCorporaSelectChange(evt){
+          console.log(evt);
+
+          let model = this.cstm_model_selected.customization_id;
+          if (!model) {
+            console.error("selected model is nothing.");
+            return;
+          }
+          let corpos = this.corpora_selected.name;
+          if (!corpos) {
+            console.error("selected corpos is nothing.");
+            return;
+          }
+
+          let baseurl = (this.local_mode) ? LOCAL_URL : BRIDGE_URL;
+          fetch(
+            `${baseurl}customizations/${model}/corpora/${corpos}`, {
+              method: "GET",
+              headers: {
+                "Content-Type": "application/json"
+              }
+            }
+          )
+            .then(res => res.json())
+            .then(json => {
+              console.log(json);
+              this.corpora_selected = json;
+            })
+        },
+
+        onCorporaDelete(){
+          this.cfmDialog.title = "削除確認";
+          this.cfmDialog.text = `${this.corpora_selected.name} 削除しますか？`;
+          this.cfmDialog.CB = ()=>{
+            this.isCorporaDeleting = true;
+            let baseurl = (this.local_mode) ? LOCAL_URL : BRIDGE_URL;
+            fetch(
+                `${baseurl}customizations/${this.cstm_model_selected.customization_id}/corpora/${this.corpora_selected.name}`, {
+                  method: "DELETE",
+                }
+              )
+              .then(res => {
+                console.log(res);
+                this.isCorporaDeleting = false;
+
+                this.showToast(`${this.corpora_selected.name} を削除しました`);
+                this.onCorporaList();
+              })
+              .catch(err =>{
+                console.error(err);
+                this.isCorporaDeleting = false;
+              })
+          };
+          this.cfmDialog.show = true;
+        },
+
+        onCorporaSendFile(){
+          let model = this.cstm_model_selected.customization_id;
+          if (!model) {
+            console.error("selected model is nothing.");
+            return;
+          }
+
+          let options = {
+            method: "POST",
+            headers: {
+              "Content-Type": this.send_corpora.file.mimetype
+            },
+          };
+
+          if (this.local_mode) {
+            options.body = this.send_corpora.file;
+
+          } else {
+            let formData = new FormData();
+            formData.append('tmptext', this.send_corpora.file);
+            options.body = formData;
+
+            // Ugh! for Node.js multer. Need auto set 'multipart/form-data'.
+            delete options.headers['Content-Type'];
+          }
+          
+          this.isCoporaTextUploading = true;
+          let baseurl = (this.local_mode) ? LOCAL_URL : BRIDGE_URL;
+          fetch(
+              `${baseurl}customizations/${model}/corpora/${this.send_corpora.name}`,
+              options
+            )
+            .then(res => {
+              console.log(res);
+              this.isCoporaTextUploading = false;
+              this.showToast(`${this.send_corpora.name} を作成しました`);
+            })
+        },
+
+        // Words
+        onWordsList(){
+          let model = this.cstm_model_selected.customization_id;
+          if (!model) {
+            console.error("selected model is nothing.");
+            return;
+          }
+
+          this.words_items = [];
+          this.words_selected = "";
+
+          let baseurl = (this.local_mode) ? LOCAL_URL : BRIDGE_URL;
+          fetch(
+              `${baseurl}customizations/${model}/words`, {
+                method: "GET",
+                headers: {
+                  "Content-Type": "application/json"
+                }
+              }
+            )
+            .then(res => res.json())
+            .then(json => {
+              console.log(json);
+
+
+              let wordslist = json.words;
+              if (wordslist.length <=0) {
+                this.showToast(`カスタムワードはありません`);
+                return;
+              }
+
+              // sort by name
+              wordslist = wordslist.sort((a, b) => {
+                return a.word < b.word ? -1 : 1;
+              });
+              this.words_items = wordslist;
+
+              // first select.
+              this.words_selected = this.words_items[0];
+              this.onWordsSelectChange();
+            })
+        },
+        onWordsSelectChange(evt){
+          console.log(evt);
+
+          let model = this.cstm_model_selected.customization_id;
+          if (!model) {
+            console.error("selected model is nothing.");
+            return;
+          }
+          let word = this.words_selected.word;
+          if (!word) {
+            console.error("selected word is nothing.");
+            return;
+          }
+
+          let baseurl = (this.local_mode) ? LOCAL_URL : BRIDGE_URL;
+          fetch(
+            `${baseurl}customizations/${model}/words/${word}`, {
+              method: "GET",
+              headers: {
+                "Content-Type": "application/json"
+              }
+            }
+          )
+            .then(res => res.json())
+            .then(json => {
+              console.log(json);
+              this.words_selected = json;
+            })
+        },
+
+        onWordDelete(){
+          this.cfmDialog.title = "削除確認";
+          this.cfmDialog.text = `${this.words_selected.word} 削除しますか？`;
+          this.cfmDialog.CB = ()=>{
+            this.isWordDeleting = true;
+            let baseurl = (this.local_mode) ? LOCAL_URL : BRIDGE_URL;
+            fetch(
+                `${baseurl}customizations/${this.cstm_model_selected.customization_id}/words/${this.words_selected.word}`, {
+                  method: "DELETE",
+                }
+              )
+              .then(res => {
+                console.log(res);
+                this.isWordDeleting = false;
+
+                this.showToast(`${this.words_selected.word} を削除しました`);
+                this.onWordsList();
+              })
+              .catch(err =>{
+                console.error(err);
+                this.isWordDeleting = false;
+              })
+          };
+          this.cfmDialog.show = true;
+        },
+
+        // on Words add Dialog
+        onWordsFileChange(file) {
+          console.log(file);
+          if (!file) {
+            this.send_words.json = null;
+            this.send_words.result = {};
+            return;
+          }
+          let self = this;
+
+          let reader = new FileReader();
+          reader.readAsText(file);
+          reader.addEventListener('load', function() {
+            console.log(reader.result);
+            if (reader.result) {
+              self.send_words.json = JSON.parse(reader.result);
+              console.log(self.send_words.json);
+            }
+          })
+        },
+        onWordsSendJson(){
+          let model = this.cstm_model_selected.customization_id;
+          if (!model) {
+            console.error("selected model is nothing.");
+            return;
+          }
+
+          let options = {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+              "words": this.send_words.json
+            })
+          };
+          
+          // let self = this;
+          this.isWordsJsonUploading = true;
+          let baseurl = (this.local_mode) ? LOCAL_URL : BRIDGE_URL;
+          fetch(
+              `${baseurl}customizations/${model}/words`,
+              options
+            )
+            .then(res => {
+              console.log(res);
+              this.send_words.result.status = `${res.status}: ${res.statusText}\r\n`;
+              res.json().then(json => {
+                console.log(json);
+                this.isWordsJsonUploading = false;
+                this.showToast(`Jsonデータを送信しました`);
+                this.send_words.result.message = (json.error) ? json.error : "";
+              })
+            })
+            .catch(err =>{
+              this.send_words.result.message = err;
+              console.error(err);
+            })
+        },
+
+        // on Word add Dialog
+
+
+      },
+      mounted() {
+        console.log("vue mounted.");
+
+        this.onCustomModelList();
+      }
+    })
+
+  </script>
+</body>
+
+</html>

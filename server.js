@@ -46,15 +46,9 @@ server
    // ))
    .use(express.static('public'))
 
+// Models
+   // List models
    .get('/models', function (req, res) {
-      // Query params
-      // req.query.name
-
-      // Path params
-      // let path = req.params.name;
-      // if (!path) {
-
-      // List Models
       speechToText.listModels()
          .then(speechModels => {
             console.log(JSON.stringify(speechModels, null, 2));
@@ -66,17 +60,14 @@ server
          });
    })
 
-   .get('/models/*', function (req, res) {
-      // Query params
-      // req.query.name
-
+   // Get a model
+   .get('/models/:id', function (req, res) {
       // Path params
-      let path = req.params[0];
+      let path = req.params.id;
       if (!path) {
          console.log('error: no params');
          res.status(500).send({"error": "Failed STT get model."});
       }
-      // Get a model
       speechToText.getModel({
          modelId: path
       })
@@ -90,6 +81,8 @@ server
          });
    })
 
+// Synchronous
+   // Recognize audio
    .post('/recognize', upload.single('tmpaudio'), async function (req, res) {
       // check upload file
       let file = req.file;
@@ -115,10 +108,15 @@ server
                case "model": // 'en-US_BroadbandModel'
                   recognizeParams.model = query[key];
                   break;
-               // languageCustomizationId: string
+               case "language_customization_id": // 'test1'
+                  recognizeParams.languageCustomizationId = query[key];
+                  break;
                // [prev] acousticCustomizationId: string
                // baseModelVersion: string
-               // customizationWeight: 0.0-1.0
+               case "customization_weight": // '0.0-1.0'
+                  recognizeParams.customizationWeight = query[key];
+                  break;
+
                // inactivityTimeout: 30,60,-1
                // [prev] keywords: ['max1000word','max1024char']
                // [perv] keywordsThreshold: 0.0-1.0
@@ -160,95 +158,412 @@ server
          });
    })
 
-   .post('/api', async (req, res) => {
+// Custom language models
+   // Create custom language model 
+   .post('/customizations', function (req, res) {
       let body = req.body;
-      console.log(body);
-
-      switch (body.api) {
-         // case "query":
-         //    discovery.query(body.params)
-         //       .then(response => {
-         //          // console.log(JSON.stringify(response.result, null, 2));
-         //          res.json(response.result);
-         //       })
-         //       .catch(err => {
-         //          console.log('error:', err);
-         //          res.status(500).send({"error": "Failed Watson Discovery query."});
-         //       });
-         //    break;
-/*
-         case "listCollections":
-            discovery.listCollections(body.params)
-               .then(response => {
-                  console.log(JSON.stringify(response.result, null, 2));
-                  res.json(response.result);
-               })
-               .catch(err => {
-                  console.log('error:', err);
-                  res.status(500).send({"error": "Failed Watson Discovery listCollections."});
-               });
-            break;
-
-         case "listTrainingQueries":
-            discovery.listTrainingQueries(body.params)
-               .then(response => {
-                  console.log(JSON.stringify(response.result, null, 2));
-                  res.json(response.result);
-               })
-               .catch(err => {
-                  console.log('error:', err);
-                  res.status(500).send({"error": "Failed Watson Discovery listTrainingQueries."});
-               });
-            break;
-
-         case "createTrainingQuery":
-            discovery.createTrainingQuery(body.params)
-               .then(response => {
-                  console.log(JSON.stringify(response.result, null, 2));
-                  res.json(response.result);
-               })
-               .catch(err => {
-                  console.log('error:', err);
-                  res.status(500).send({"error": "Failed Watson Discovery createTrainingQuery."});
-               });
-            break;
-
-         case "getTrainingQuery":
-            discovery.getTrainingQuery(body.params)
-               .then(response => {
-                  console.log(JSON.stringify(response.result, null, 2));
-                  res.json(response.result);
-               })
-               .catch(err => {
-                  console.log('error:', err);
-                  res.status(500).send({"error": "Failed Watson Discovery getTrainingQuery."});
-               });
-            break;
-
-         case "updateTrainingQuery":
-            discovery.updateTrainingQuery(body.params)
-               .then(response => {
-                  console.log(JSON.stringify(response.result, null, 2));
-                  res.json(response.result);
-               })
-               .catch(err => {
-                  console.log('error:', err);
-                  res.status(500).send({"error": "Failed Watson Discovery updateTrainingQuery."});
-               });
-            break;
-*/
-         default:
-            break;
+      // Check Params
+      if (!(body.name && body.base_model_name)) {
+         res.status(500).send({"error": "Invalid params!"});
+         return;
       }
-   });
 
+      // set query params
+      const createLanguageModelParams = {
+         name: body.name,
+         baseModelName: body.base_model_name
+      };
+      if (body.description) {
+         createLanguageModelParams.description = body.description;
+      }
+      // dialect: string
 
+      speechToText.createLanguageModel(createLanguageModelParams)
+         .then(languageModel => {
+            console.log(`${languageModel}`);
+            res.json(languageModel);
+         })
+         .catch(err => {
+            console.log('error:', err);
+            res.status(500).send({"error": "Failed STT create language model."});
+            return;
+         });
+   })
 
+   // List custom language models
+   .get('/customizations', function (req, res) {
+      speechToText.listLanguageModels()
+         .then(languageModels => {
+            console.log(JSON.stringify(languageModels, null, 2));
+            res.json(languageModels.result);
+         })
+         .catch(err => {
+            console.log('error:', err);
+            res.status(500).send({"error": "Failed STT customizations."});
+         });
+   })
+
+   // Get a custom language model
+   .get('/customizations/:id', function (req, res) {
+      // Path params
+      let path = req.params.id;
+      if (!path) {
+         console.log('error: no params');
+         res.status(500).send({"error": "Failed STT get customizations model."});
+      }
+      speechToText.getLanguageModel({
+         customizationId: path
+      })
+         .then(languageModel => {
+            console.log(JSON.stringify(languageModel, null, 2));
+            res.json(languageModel.result);
+         })
+         .catch(err => {
+            console.log('error:', err);
+            res.status(500).send({"error": "Failed STT get customizations model."});
+         });
+   })
+
+   // Delete a custom language model
+   .delete('/customizations/:id', function (req, res) {
+      // Path params
+      let id = req.params.id;
+      if (!id) {
+         console.log('error: no params');
+         res.status(500).send({"error": "Failed STT delete customizations model."});
+      }
+      speechToText.deleteLanguageModel({
+         customizationId: id
+      })
+         .then(result => {
+            console.log(JSON.stringify(result, null, 2));
+            res.json(result);
+         })
+         .catch(err => {
+            console.log('error:', err);
+            res.status(500).send({"error": "Failed STT delete customizations model."});
+         });
+   })
+
+   // Train a custom language model
+   .post('/customizations/:id/train', function (req, res) {
+      // Path params
+      let id = req.params.id;
+      if (!id) {
+         console.log('error: no params');
+         res.status(500).send({"error": "Failed STT train customizations model."});
+      }
+      speechToText.trainLanguageModel({
+         customizationId: id
+      })
+         .then(result => {
+            console.log(JSON.stringify(result, null, 2));
+            res.json(result);
+         })
+         .catch(err => {
+            console.log('error:', err);
+            res.status(500).send({"error": "Failed STT train customizations model."});
+         });
+   })
+
+   // Reset a custom language model
+   .post('/customizations/:id/reset', function (req, res) {
+      // Path params
+      let id = req.params.id;
+      if (!id) {
+         console.log('error: no params');
+         res.status(500).send({"error": "Failed STT reset customizations model."});
+      }
+      speechToText.resetLanguageModel({
+         customizationId: id
+      })
+         .then(result => {
+            console.log(JSON.stringify(result, null, 2));
+            res.json(result);
+         })
+         .catch(err => {
+            console.log('error:', err);
+            res.status(500).send({"error": "Failed STT reset customizations model."});
+         });
+   })
+
+// Corpora
+   // List corpora
+   .get('/customizations/:id/corpora', function (req, res) {
+      // Path params
+      let path = req.params.id;
+      if (!path) {
+         console.log('error: no params');
+         res.status(500).send({"error": "Failed STT get corpora list."});
+      }
+      speechToText.listCorpora({
+         customizationId: path,
+         })
+         .then(corpora => {
+            console.log(JSON.stringify(corpora, null, 2));
+            res.json(corpora.result);
+         })
+         .catch(err => {
+            console.log('error:', err);
+            res.status(500).send({"error": "Failed STT models."});
+         });
+   })
+
+   // Add a corpus
+   .post('/customizations/:id/corpora/:corpus', upload.single('tmptext'), function (req, res) {
+      // Path params
+      let id = req.params.id;
+      if (!id) {
+         console.log('error: no params id');
+         res.status(500).send({"error": "Failed STT add corpus."});
+      }
+      let corpus = req.params.corpus;
+      if (!corpus) {
+         console.log('error: no params corpus');
+         res.status(500).send({"error": "Failed STT add corpus."});
+      }
+      // check upload file
+      let file = req.file;
+      if (file) {
+         console.log("file:" + file.originalname);
+      }else{
+         console.log('error: no params');
+         res.status(500).send({"error": "Failed STT add corpos. no params."});
+         return;
+      }
+
+      // set query params
+      const addCorpusParams = {
+         customizationId: id,
+         corpusFile: fs.createReadStream(file.path),
+         corpusName: corpus,
+      };
+
+      speechToText.addCorpus(addCorpusParams)
+         .then(result => {
+            console.log(result);
+            res.json(result);
+
+            // Remove file
+            fs.unlinkSync(file.path);
+         })
+         .catch(err => {
+            console.log('error:', err);
+            res.status(500).send({"error": "Failed STT add corpus."});
+            return;
+         });
+   })
+
+   // Get a corpus
+   .get('/customizations/:id/corpora/:corpus', function (req, res) {
+      // Path params
+      let id = req.params.id;
+      if (!id) {
+         console.log('error: no params id');
+         res.status(500).send({"error": "Failed STT get corpus."});
+      }
+      let corpus = req.params.corpus;
+      if (!corpus) {
+         console.log('error: no params corpus');
+         res.status(500).send({"error": "Failed STT get corpus."});
+      }
+      speechToText.getCorpus({
+         customizationId: id,
+         corpusName: corpus,
+      })
+         .then(corpus => {
+            console.log(JSON.stringify(corpus, null, 2));
+            res.json(corpus.result);
+         })
+         .catch(err => {
+            console.log('error:', err);
+            res.status(500).send({"error": "Failed STT get corpus."});
+         });
+   })
+
+   // Delete a corpus
+   .delete('/customizations/:id/corpora/:corpus', function (req, res) {
+      // Path params
+      let id = req.params.id;
+      if (!id) {
+         console.log('error: no params id');
+         res.status(500).send({"error": "Failed STT delete corpus."});
+      }
+      let corpus = req.params.corpus;
+      if (!corpus) {
+         console.log('error: no params corpus');
+         res.status(500).send({"error": "Failed STT delete corpus."});
+      }
+      speechToText.deleteCorpus({
+         customizationId: id,
+         corpusName: corpus,
+      })
+         .then(result => {
+            console.log(JSON.stringify(result, null, 2));
+            res.json(result);
+         })
+         .catch(err => {
+            console.log('error:', err);
+            res.status(500).send({"error": "Failed STT delete corpus."});
+         });
+   })
+
+// Custom words
+   // List words
+   .get('/customizations/:id/words', function (req, res) {
+      // Path params
+      let path = req.params.id;
+      if (!path) {
+         console.log('error: no params');
+         res.status(500).send({"error": "Failed STT get words list."});
+      }
+      speechToText.listWords({
+         customizationId: path,
+         })
+         .then(words => {
+            console.log(JSON.stringify(words, null, 2));
+            res.json(words.result);
+         })
+         .catch(err => {
+            console.log('error:', err);
+            res.status(500).send({"error": "Failed STT models."});
+         });
+   })
+
+   // Add custom words
+   .post('/customizations/:id/words', function (req, res) {
+      let FuncName = "Add Words"
+      // Path params
+      let id = req.params.id;
+      if (!id) {
+         console.log(`[${FuncName}] error: no params id`);
+         res.status(500).send({"error": "Failed STT add words."});
+      }
+
+      let body = req.body;
+      if (!(body && body.words)) {
+         console.log(`[${FuncName}] error: no params words`);
+         res.status(500).send({"error": "Failed STT add words."});
+      }
+
+      // set query params
+      const addWordsParams = {
+         customizationId: id,
+         contentType: 'application/json',
+         words: body.words,
+      };
+
+      speechToText.addWords(addWordsParams)
+         .then(result => {
+            console.log(`[${FuncName}] ${result}`);
+            res.json(result);
+         })
+         .catch(err => {
+            console.log(`[${FuncName}] ${err}`);
+            res.status(500).send({ "error": `${err}` });
+            return;
+         });
+   })
+
+   // Add a word
+   .put('/customizations/:id/words/:word', function (req, res) {
+      // Path params
+      let id = req.params.id;
+      if (!id) {
+         console.log('error: no params id');
+         res.status(500).send({"error": "Failed STT add word."});
+      }
+      let word = req.params.word;
+      if (!word) {
+         console.log('error: no params word');
+         res.status(500).send({"error": "Failed STT add word."});
+      }
+
+      // set query params
+      const addWordParams = {
+         customizationId: id,
+         wordName: word,
+      };
+      if (body.word) {
+         addWordParams.word = body.word;
+      }
+      if (body.word) {
+         addWordParams.soundsLike = body.sounds_like;
+      }
+      if (body.word) {
+         addWordParams.displayAs = body.display_as;
+      }
+
+      speechToText.addWord(addWordParams)
+         .then(result => {
+            console.log(result);
+            res.json(result);
+         })
+         .catch(err => {
+            console.log('error:', err);
+            res.status(500).send({"error": "Failed STT add word."});
+            return;
+         });
+   })
+
+   // Get a word
+   .get('/customizations/:id/words/:word', function (req, res) {
+      // Path params
+      let id = req.params.id;
+      if (!id) {
+         console.log('error: no params id');
+         res.status(500).send({"error": "Failed STT get word."});
+      }
+      let word = req.params.word;
+      if (!word) {
+         console.log('error: no params word');
+         res.status(500).send({"error": "Failed STT get word."});
+      }
+      speechToText.getWord({
+         customizationId: id,
+         wordName: word,
+      })
+         .then(word => {
+            console.log(JSON.stringify(word, null, 2));
+            res.json(word.result);
+         })
+         .catch(err => {
+            console.log('error:', err);
+            res.status(500).send({"error": "Failed STT get word."});
+         });
+   })
+
+   // Delete a corpus
+   .delete('/customizations/:id/words/:word', function (req, res) {
+      // Path params
+      let id = req.params.id;
+      if (!id) {
+         console.log('error: no params id');
+         res.status(500).send({"error": "Failed STT delete word."});
+      }
+      let word = req.params.word;
+      if (!word) {
+         console.log('error: no params word');
+         res.status(500).send({"error": "Failed STT delete word."});
+      }
+      speechToText.deleteWord({
+         customizationId: id,
+         wordName: word,
+      })
+         .then(result => {
+            console.log(JSON.stringify(result, null, 2));
+            res.json(result);
+         })
+         .catch(err => {
+            console.log('error:', err);
+            res.status(500).send({"error": "Failed STT delete word."});
+         });
+   })
 
 const port = process.env.PORT || 3000;
 server.listen(port, () => {
   // eslint-disable-next-line no-console
-  console.log('Server running on port: %d', port);
+  console.log('Watson Speech Bridge Server running on port: %d', port);
 //   console.log('process.env: ', process.env);
 });
 
